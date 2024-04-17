@@ -4,73 +4,176 @@ from sklearn.ensemble import RandomForestRegressor
 from xgboost import XGBRegressor
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.tree import DecisionTreeRegressor
-from itertools import combinations
-from sklearn.metrics import r2_score, mean_absolute_error
-import time
 import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
 from sklearn.exceptions import DataConversionWarning
-import warnings
 import streamlit as st
-import pandas as pd
-st.set_page_config(page_title="ESTIMATIVA DE CUSTO")
+
+# Define as configurações da página primeiro
+st.set_page_config(
+    page_title="Estimativa de Custo",
+    layout="wide"
+)
+
+with open('style.css') as f:
+    st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
 
 # lendo a base de dados
 baseR01 = pd.read_excel("BD1.xlsx")
 baseR01 = baseR01.drop(['Obra'], axis=1)
 
-st.title("ESTIMATIVA DE CUSTO")
-st.sidebar.title("Selecione os parâmetros do projeto")
 
-bancadas = st.sidebar.selectbox("Padrão de bancadas", ["Alto", "Médio", "Baixo"])
-revestimentos = st.sidebar.selectbox("Padrão de revestimentos", ["Alto", "Médio", "Baixo"])
-loucas = st.sidebar.selectbox("Padrão de louças", ["Alto", "Médio", "Baixo"])
-metais = st.sidebar.selectbox("Padrão de metais", ["Alto", "Médio", "Baixo"])
-esquadrias = st.sidebar.selectbox("Padrão de esquadrias", ["Alto", "Médio", "Baixo"])
-fundação = st.sidebar.selectbox("Tipo de fundação",["Sapata", "Estacão","Hélice"])
-Elevadores = st.sidebar.number_input("Quantidade de elevadores")
-uni = st.sidebar.number_input("Total de unidades privativas")
-indice_aço = st.sidebar.number_input("Indice de aço (Kg/m²)")
-indice_concreto = st.sidebar.number_input("Indice de concreto (m³/m²)")
-indice_forma = st.sidebar.number_input("Indice de forme (m²/m²)")
-ic = st.sidebar.number_input("IC Atual")
-prazo = st.sidebar.number_input("Prazo de execução")
-subsolos = st.sidebar.number_input("Quantidade de subsolos")
+# Escrever o título "Estimativa de Custo" e "AI" em tamanho de fonte 1.5x
+st.write("<h1 style='font-size: 3em;'>Estimativa de Custo <span style='font-size: 0.5em; color: red;'>AI</span></h1>", unsafe_allow_html=True)
 
-areaequivalente = 23660.249
-areaconstrutiva = 24323.73
-areaprivativa = 15725.45
-perimetroterreno = 150
-tipo = 27
 
-uni = 88
+
+st.sidebar.subheader("Selecione os parâmetros do projeto")
+
+estilo_caixa = """
+    background-color: #111;
+    color: #fff;
+    padding: 1px;
+    border-radius: 10px;
+    margin-bottom: 20px;
+"""
+# Exibe a caixa estilizada no texto principal
+st.markdown(f'<div style="{estilo_caixa}"></div>', unsafe_allow_html=True)
+
+estilo_caixa = """
+    background-color: #111;
+    color: #fff;
+    padding: 1px;
+    border-radius: 10px;
+    margin-bottom: 20px;
+"""
+
+# Exibe a caixa estilizada na barra lateral
+st.sidebar.markdown(f'<div style="{estilo_caixa}"></div>', unsafe_allow_html=True)
+
+
+# Caixa de texto para o nome do projeto
+nome_do_projeto = st.sidebar.text_input("Nome do Projeto")
+
+estilo_retangulo = """
+    background-color: #D3D3D3;
+    color: black;
+    padding: 5px;
+    border-radius: 5px;
+    margin-bottom: 10px;
+"""
+
+# Exibe as informações dentro dos retângulos estilizados
+st.markdown(f'<div style="{estilo_retangulo}">Projeto: {nome_do_projeto}</div>', unsafe_allow_html=True)
+
+# Criar uma linha extensa usando st.markdown()
+st.markdown("")
+
+# Estimativa Inicial
+with st.expander("Estimativa Inicial", expanded=False):
+    # Seção Gerais
+    with st.sidebar.expander("**1. Gerais**", expanded=False):
+        ic = st.number_input("IC Atual")
+        prazo = st.number_input("Prazo de execução", help="Meses")
+
+    # Seção 1: Área
+    with st.sidebar.expander("**2. Área**", expanded=False):
+        # Define o layout de duas colunas dentro do expander
+        col1, col2 = st.columns(2)
+
+        # Adiciona os widgets em cada coluna
+        with col1:
+            subsolos = st.number_input("Qtde. Subsolo")
+            terreo = st.number_input("Qtde. Terreo")
+            garagem = st.number_input("Qtde. Garagem")
+            lazer = st.number_input("Qtde. Lazer")
+            tipo = st.number_input("Qtde. Tipo")
+            penthouses = st.number_input("Qtde. Penthouse")
+            rooftop = st.number_input("Qtde. Rooftop")
+        with col2:
+            areasubsolo = st.number_input("Área Subsolos", help="Área média dos pavimentos de Subsolos (m²)")
+            areaterreo = st.number_input("Área Terreo", help="Área média dos pavimentos de Térreo (m²)")
+            areagaragem = st.number_input("Área Garagem", help="Área média dos pavimentos de Garagens (m²)")
+            arealazer = st.number_input("Área Lazer", help="Área média dos pavimentos de Lazers (m²)")
+            areatipo = st.number_input("Área Tipo", help="Área média dos pavimentos de Tipo (m²)")
+            areapenthouses = st.number_input("Área Penthouse", help="Área média dos pavimentos de Penthouses (m²)")
+            arearooftop = st.number_input("Área Rooftop", help="Área média dos pavimentos de Rooftop (m²)")
+        uni = st.number_input("Total de unidades privativas")
+
+    # Seção 2: Fundação
+    with st.sidebar.expander("**3. Fundação**", expanded=False):
+        # Widgets para a segunda seção
+        valores_fundacao = {"Hélice": 3, "Estacão": 2, "Sapata": 1}
+        valor_fundacao = st.radio("Tipo de fundação", list(valores_fundacao.keys()))
+        fundação = valores_fundacao[valor_fundacao]
+        perimetroterreno= st.number_input("Perímetro do terreno", help="m")
+
+    # Seção 4: Estrutura
+    with st.sidebar.expander("**4. Estrutura**", expanded=False):
+        # Widgets para a terceira seção
+        indice_aço = st.number_input("Índice de aço (Kg/m²)")
+        indice_concreto = st.number_input("Índice de concreto (m³/m²)")
+        indice_forma = st.number_input("Índice de forma (m²/m²)")
+
+    # Seção 4: Elevadores
+    with st.sidebar.expander("**5. Elevadores**", expanded=False):
+        # Widget para a quarta seção
+        elevadores = st.number_input("Quantidade de elevadores", value=0.0)
+
+    # Seção 5: Acabamento
+    with st.sidebar.expander("**6. Acabamento**", expanded=False):
+        # Widgets para a quinta seção
+        valores_acabamento = {"Alto": 3, "Médio": 2, "Baixo": 1}
+
+        valor_bancadas = st.radio("Padrão de bancadas", ["Alto", "Médio", "Baixo"])
+        bancadas = valores_acabamento[valor_bancadas]
+
+        valor_revestimentos = st.radio("Padrão de revestimentos", ["Alto", "Médio", "Baixo"])
+        revestimentos = valores_acabamento[valor_revestimentos]
+
+        valor_loucas = st.radio("Padrão de louças", ["Alto", "Médio", "Baixo"])
+        loucas = valores_acabamento[valor_loucas]
+
+        valor_metais = st.radio("Padrão de metais", ["Alto", "Médio", "Baixo"])
+        metais = valores_acabamento[valor_metais]
+
+        valor_esquadrias = st.radio("Padrão de esquadrias", ["Alto", "Médio", "Baixo"])
+        esq= valores_acabamento[valor_esquadrias]
+
+
+
+# Texto no final da barra lateral com estilo de fonte personalizado
+st.sidebar.markdown("<p style='text-align: center; font-family: Courier New, monospace; font-size: 12px;'>© 2024 Planejamento e Controle de Obras</p>", unsafe_allow_html=True)
+
+
+
+# Condicional para atribuir valores com base na quantidade de subsolos
+if subsolos == 3:
+    valor = 0.9538
+elif subsolos == 2:
+    valor = 0.8183
+elif subsolos == 1:
+    valor = 0.7124
+else:
+    valor = 0.8183
+
+areaequivalente = (subsolos*areasubsolo*valor + terreo*areaterreo*0.7592 +
+             garagem*areagaragem*0.7797 + lazer*arealazer*0.9054 + tipo*areatipo*1 + penthouses*areapenthouses*0.9351 +
+             rooftop*arearooftop*1.0301 + 140*0.7)
+
+areaconstrutiva = (subsolos*areasubsolo + terreo*areaterreo + garagem*areagaragem + lazer*arealazer + tipo*areatipo*1 + penthouses*areapenthouses +
+             rooftop*arearooftop + 140.00)
+
+
+areaprivativa = tipo*areatipo+ penthouses*areapenthouses + rooftop*arearooftop
+
+if uni == 0:
+    uni = 1
+
 areaprivativauni = (areaprivativa)/uni
-
-indice_aço = 24.941
-indice_concreto = 0.240
-indice_forma = 1.90
 
 aço = indice_aço*areaconstrutiva
 concreto = indice_concreto*areaconstrutiva
 forma = indice_forma*areaconstrutiva
-
-subsolos = 3
-fundação = 3
-
-bancadas = 2
-revestimentos = 2
-loucas = 2
-metais = 2
-esq = 2
-elevadores = 3
-
-prazo = 37
-
-ic= 3.0151
-icbase = 3.00304384793037
-orçamento_base = 75990005.5081899
-orçamento_real = orçamento_base*ic/icbase
 
 # AREA
 
@@ -82,9 +185,9 @@ y_train = baseR01['ORÇAMENTO1']
 linear_model = LinearRegression()
 lasso_model = Lasso()
 ridge_model = Ridge()
-rf_model = RandomForestRegressor()
-xgb_model = XGBRegressor()
-dt_model = DecisionTreeRegressor()
+rf_model = RandomForestRegressor(random_state=42)  # Definindo a semente aleatória como 42
+xgb_model = XGBRegressor(random_state=42)  # Definindo a semente aleatória como 42
+dt_model = DecisionTreeRegressor(random_state=42)  # Definindo a semente aleatória como 42
 poly = PolynomialFeatures(degree=2)
 
 # Treinar os modelos
@@ -532,24 +635,55 @@ tabela1 = pd.DataFrame(data)
 # Adicionar as médias ao final de cada coluna
 tabela1.loc[len(tabela1)] = ['Média', tabela1['Área'].mean(), tabela1['Estrutura'].mean(), tabela1['Bancadas'].mean(), tabela1['Revestimento'].mean(), tabela1['Louças'].mean(), tabela1['Metais'].mean(), tabela1['Esquadrias'].mean(), tabela1['Instalações'].mean(), tabela1['Elevadores'].mean(),tabela1['Fundação'].mean(),tabela1['Indiretos'].mean() ]
 
+
 # Definir os dados
 revestimentos = float((pred4_linear*uni + pred4_lasso*uni + pred4_ridge*uni)/3)
 instalações = float(pred8_poly)
 louças = float((pred5_linear*uni + pred5_lasso*uni + pred5_ridge*uni)/3)
 metais = float((pred6_linear*uni + pred6_lasso*uni + pred6_ridge*uni)/3)
 bancadas = float(pred3_linear*uni + pred3_lasso*uni + pred3_ridge*uni)/3
-area = float(tabela1['Área'].mean()+tabela1['Estrutura'].mean())/2
-elevadores = float((pred9_rf + pred9_xgb + pred9_dt)/3)
+area = float(tabela1['Área'].mean() + tabela1['Estrutura'].mean())/2
+elevadores = float(tabela1['Elevadores'].mean())
 infraestrutura = float((pred10_linear + pred10_lasso + pred10_ridge)/3)
 custosdeprazo = float((pred11_linear + pred11_lasso + pred11_ridge)/3)
-orcamento = custosdeprazo + revestimentos + instalações + louças + metais + bancadas + area + elevadores + infraestrutura + tabela1["Esquadrias"].mean()
+esquadrias = float((pred7_linear*tipo + pred7_lasso*tipo + pred7_ridge*tipo)/3)
+orcamento = custosdeprazo + revestimentos + instalações + louças + metais + bancadas + area + elevadores + infraestrutura + esquadrias
 orcamento_previsto = orcamento*1.01
 
-st.write("ORÇAMENTO PREVISTO: R$", f'{"{:,.2f}".format(orcamento_previsto)}')
-st.write("ORÇAMENTO PREVISTO: IC$", f'{"{:,.2f}".format(orcamento_previsto/ic)}')
+
+# Calcular o valor de orçamento_previsto/ic dividido por areaequivalente
+orcamento_ic_por_areaequivalente = orcamento_previsto / ic / areaequivalente
+
+# Formatar os três valores em caixas separadas com tamanho aumentado e cor de fundo cinza claro, com uma barra fina vertical à esquerda de cada caixa
+html = f'<div style="display: flex;">' \
+       f'<div style="flex: 1; border-left: 4px solid #888888; background-color: #f2f2f2; padding: 20px; border-radius: 5px; margin-right: 10px; height: 100px;">' \
+           f'<p style="font-size: 0.9em; font-weight: bold; margin-bottom: 5px;">CUSTO PREVISTO:</p>' \
+           f'<p style="font-size: 1.5em; font-weight: bold;">R$ {"{:,.2f}".format(orcamento_previsto)}</p>' \
+       f'</div>' \
+       f'<div style="flex: 1; border-left: 4px solid #888888; background-color: #f2f2f2; padding: 20px; border-radius: 5px; margin-right: 10px; height: 100px;">' \
+           f'<p style="font-size: 0.9em; font-weight: bold; margin-bottom: 5px;">CUSTO PREVISTO:</p>' \
+           f'<p style="font-size: 1.5em; font-weight: bold;">IC$ {"{:,.2f}".format(orcamento_previsto/ic)}</p>' \
+       f'</div>' \
+       f'<div style="flex: 1; border-left: 4px solid #888888; background-color: #f2f2f2; padding: 20px; border-radius: 5px; height: 100px;">' \
+           f'<p style="font-size: 0.9em; font-weight: bold; margin-bottom: 5px;">IC$/AE:</p>' \
+           f'<p style="font-size: 1.5em; font-weight: bold;">{"{:,.2f}".format(orcamento_ic_por_areaequivalente)}</p>' \
+       f'</div>' \
+       f'</div>'
+
+# Renderizar as caixas na interface do Streamlit usando st.markdown()
+st.markdown(html, unsafe_allow_html=True)
+
+
+# Criar uma linha extensa usando st.markdown()
+st.markdown("")
+
+
+Orçamento_AE = orcamento_previsto/areaequivalente
+
+
 
 dados = {
-    'Descrição': [
+    'DESCRIÇÃO': [
         'CUSTOS INDIRETOS',
         '01.01 - SERVICOS PRELIMINARES E GERAIS',
         '01.02 - IMPLANTAÇÃO DA OBRA',
@@ -586,101 +720,120 @@ dados = {
         '02.30 - VISTORIAS/ENTREGA',
         '02.31 - DESPESAS POS-ENTREGA DA OBRA'
     ],
-    'Custo Previsto R$': [
-        f'R$ {"{:,.2f}".format(28.3559/100*area)}',#CUSTOS INDIRETOS
+    'CUSTO PREVISTO R$': [
+        f'R$ {"{:,.2f}".format(custosdeprazo)}',#CUSTOS INDIRETOS
         
-        f'R$ {"{:,.2f}".format(3.5833/100*area)}',#SERVICOS PRELIMINARES E GERAIS
-        f'R$ {"{:,.2f}".format(2.1607/100*area)}',#IMPLANTAÇÃO DA OBRA
-        f'R$ {"{:,.2f}".format(6.6338/100*area)}',#EQUIPAMENTOS/FERRAMENTAS
-        f'R$ {"{:,.2f}".format(15.1586/100*area)}',#CUSTOS ADMINISTRATIVOS
-        f'R$ {"{:,.2f}".format(0.5625/100*area)}',#LIMPEZA E DESMOBILIZAÇÃO
-        f'R$ {"{:,.2f}".format(0.2570/100*area)}',#OUTRAS DESPESAS DE OBRA
+        f'R$ {"{:,.2f}".format(12.7076/100*custosdeprazo)}',#SERVICOS PRELIMINARES E GERAIS
+        f'R$ {"{:,.2f}".format(7.6307/100*custosdeprazo)}',#IMPLANTAÇÃO DA OBRA
+        f'R$ {"{:,.2f}".format(23.4389/100*custosdeprazo)}',#EQUIPAMENTOS/FERRAMENTAS
+        f'R$ {"{:,.2f}".format(53.3418/100*custosdeprazo)}',#CUSTOS ADMINISTRATIVOS
+        f'R$ {"{:,.2f}".format(1.9807/100*custosdeprazo)}',#LIMPEZA E DESMOBILIZAÇÃO
+        f'R$ {"{:,.2f}".format(0.9003/100*custosdeprazo)}',#OUTRAS DESPESAS DE OBRA
         
-        f'R$ {"{:,.2f}".format(71.6441/100*area+tabela1["Esquadrias"].mean()+revestimentos+louças+metais+bancadas+elevadores+instalações+infraestrutura+orcamento_previsto*0.01)}',#CUSTOS DIRETOS
+        f'R$ {"{:,.2f}".format(area+esquadrias+revestimentos+louças+metais+bancadas+elevadores+instalações+infraestrutura+orcamento_previsto*0.01)}',#CUSTOS DIRETOS
          
-        f'R$ {"{:,.2f}".format(2.8433/100*area)}',#CONTENÇÃO/ESCAVAÇÃO
-        f'R$ {"{:,.2f}".format(infraestrutura)}',#INFRAESTRUTURA
-        f'R$ {"{:,.2f}".format(33.0522/100*area)}',#SUPERESTRUTURA
-        f'R$ {"{:,.2f}".format(2.3747/100*area)}',#MARCACAO  ALV. EXT. C/ TALISCA
-        f'R$ {"{:,.2f}".format(1.1178/100*area)}',#CONTRAPISO
-        f'R$ {"{:,.2f}".format(6.4668/100*area)}',#ALVENARIA INTERNA
-        f'R$ {"{:,.2f}".format(0.5824/100*area)}',#CONTRAMARCO
-        f'R$ {"{:,.2f}".format(1.7357/100*area)}',#REBOCO EXTERNO
+        f'R$ {"{:,.2f}".format(26.0307/100*infraestrutura)}',#CONTENÇÃO/ESCAVAÇÃO
+        f'R$ {"{:,.2f}".format(73.9693/100*infraestrutura)}',#INFRAESTRUTURA
+        f'R$ {"{:,.2f}".format(48.1251/100*area)}',#SUPERESTRUTURA
+        f'R$ {"{:,.2f}".format(3.4514/100*area)}',#MARCACAO  ALV. EXT. C/ TALISCA
+        f'R$ {"{:,.2f}".format(1.6258/100*area)}',#CONTRAPISO
+        f'R$ {"{:,.2f}".format(9.3271/100*area)}',#ALVENARIA INTERNA
+        f'R$ {"{:,.2f}".format(0.8445/100*area)}',#CONTRAMARCO
+        f'R$ {"{:,.2f}".format(2.5130/100*area)}',#REBOCO EXTERNO
         f'R$ {"{:,.2f}".format(instalações)}',#INST. ELÉTRICAS/HIDROSANITARIAS/GLP
-        f'R$ {"{:,.2f}".format(3.4541/100*area)}',#REBOCO INTERNO
-        f'R$ {"{:,.2f}".format(3.0525/100*area)}',#FORRO
-        f'R$ {"{:,.2f}".format(3.3839/100*area)}',#IMPERMEABILIZACAO
+        f'R$ {"{:,.2f}".format(5.0129/100*area)}',#REBOCO INTERNO
+        f'R$ {"{:,.2f}".format(4.4077/100*area)}',#FORRO
+        f'R$ {"{:,.2f}".format(4.9245/100*area)}',#IMPERMEABILIZACAO
         f'R$ {"{:,.2f}".format(revestimentos)}',#REVESTIMENTOS
         f'R$ {"{:,.2f}".format(bancadas)}',#BANCADAS
-        f'R$ {"{:,.2f}".format(1.8849/100*area)}',#EMASSAMENTO  1 DEMAO
-        f'R$ {"{:,.2f}".format(0.9586/100*area)}',#REVESTIMENTO EXTERNO
-        f'R$ {"{:,.2f}".format(tabela1["Esquadrias"].mean())}',#ESQUADRIAS DE ALUMINIO
+        f'R$ {"{:,.2f}".format(2.7311/100*area)}',#EMASSAMENTO  1 DEMAO
+        f'R$ {"{:,.2f}".format(1.4011/100*area)}',#REVESTIMENTO EXTERNO
+        f'R$ {"{:,.2f}".format(esquadrias)}',#ESQUADRIAS DE ALUMINIO
         f'R$ {"{:,.2f}".format(elevadores)}',#ELEVADORES
-        f'R$ {"{:,.2f}".format(0.4877/100*area)}',#LIMPEZA GROSSA
-        f'R$ {"{:,.2f}".format(2.1531/100*area)}',#ESQUADRIAS DE MADEIRA/PCF
-        f'R$ {"{:,.2f}".format(2.3842/100*area)}',#PINTURA FINAL
+        f'R$ {"{:,.2f}".format(0.7087/100*area)}',#LIMPEZA GROSSA
+        f'R$ {"{:,.2f}".format(3.1158/100*area)}',#ESQUADRIAS DE MADEIRA/PCF
+        f'R$ {"{:,.2f}".format(3.4601/100*area)}',#PINTURA FINAL
         f'R$ {"{:,.2f}".format(louças)}',#LOUCAS
         f'R$ {"{:,.2f}".format(metais)}',#METAIS
-        f'R$ {"{:,.2f}".format(0.8782/100*area)}',#LIMPEZA FINAL
-        f'R$ {"{:,.2f}".format(4.6593/100*area)}',#SERVICOS COMPLEMENTARES
-        f'R$ {"{:,.2f}".format(0.1747/100*area)}',#VISTORIAS/ENTREGA
+        f'R$ {"{:,.2f}".format(1.2862/100*area)}',#LIMPEZA FINAL
+        f'R$ {"{:,.2f}".format(6.8106/100*area)}',#SERVICOS COMPLEMENTARES
+        f'R$ {"{:,.2f}".format(0.2545/100*area)}',#VISTORIAS/ENTREGA
         f'R$ {"{:,.2f}".format(1.0/100*orcamento_previsto)}'#DESPESAS POS-ENTREGA DA OBRA
     ],
-        'Custo Previsto IC$': [
-        f'IC$ {"{:,.2f}".format(28.3559/100*area/ic)}',#CUSTOS INDIRETOS
+        'CUSTO PREVISTO IC$': [
+    f'R$ {"{:,.2f}".format(custosdeprazo/ic)}',#CUSTOS INDIRETOS
         
-        f'IC$ {"{:,.2f}".format(3.5833/100*area/ic)}',#SERVICOS PRELIMINARES E GERAIS
-        f'IC$ {"{:,.2f}".format(2.1607/100*area/ic)}',#IMPLANTAÇÃO DA OBRA
-        f'IC$ {"{:,.2f}".format(6.6338/100*area/ic)}',#EQUIPAMENTOS/FERRAMENTAS
-        f'IC$ {"{:,.2f}".format(15.1586/100*area/ic)}',#CUSTOS ADMINISTRATIVOS
-        f'IC$ {"{:,.2f}".format(0.5625/100*area/ic)}',#LIMPEZA E DESMOBILIZAÇÃO
-        f'IC$ {"{:,.2f}".format(0.2570/100*area/ic)}',#OUTRAS DESPESAS DE OBRA
+        f'R$ {"{:,.2f}".format(12.7076/100*custosdeprazo/ic)}',#SERVICOS PRELIMINARES E GERAIS
+        f'R$ {"{:,.2f}".format(7.6307/100*custosdeprazo/ic)}',#IMPLANTAÇÃO DA OBRA
+        f'R$ {"{:,.2f}".format(23.4389/100*custosdeprazo/ic)}',#EQUIPAMENTOS/FERRAMENTAS
+        f'R$ {"{:,.2f}".format(53.3418/100*custosdeprazo/ic)}',#CUSTOS ADMINISTRATIVOS
+        f'R$ {"{:,.2f}".format(1.9807/100*custosdeprazo/ic)}',#LIMPEZA E DESMOBILIZAÇÃO
+        f'R$ {"{:,.2f}".format(0.9003/100*custosdeprazo/ic)}',#OUTRAS DESPESAS DE OBRA
         
-        f'IC$ {"{:,.2f}".format((71.6441/100*area+tabela1["Esquadrias"].mean()+revestimentos+louças+metais+bancadas+elevadores+instalações+infraestrutura+orcamento_previsto*0.01)/ic)}',#CUSTOS DIRETOS
+        f'R$ {"{:,.2f}".format((area+esquadrias+revestimentos+louças+metais+bancadas+elevadores+instalações+infraestrutura+orcamento_previsto*0.01)/ic)}',#CUSTOS DIRETOS
          
-        f'IC$ {"{:,.2f}".format(2.8433/100*area/ic)}',#CONTENÇÃO/ESCAVAÇÃO
-        f'IC$ {"{:,.2f}".format(infraestrutura/ic)}',#INFRAESTRUTURA
-        f'IC$ {"{:,.2f}".format(33.0522/100*area/ic)}',#SUPERESTRUTURA
-        f'IC$ {"{:,.2f}".format(2.3747/100*area/ic)}',#MARCACAO  ALV. EXT. C/ TALISCA
-        f'IC$ {"{:,.2f}".format(1.1178/100*area/ic)}',#CONTRAPISO
-        f'IC$ {"{:,.2f}".format(6.4668/100*area/ic)}',#ALVENARIA INTERNA
-        f'IC$ {"{:,.2f}".format(0.5824/100*area/ic)}',#CONTRAMARCO
-        f'IC$ {"{:,.2f}".format(1.7357/100*area/ic)}',#REBOCO EXTERNO
-        f'IC$ {"{:,.2f}".format(instalações/ic)}',#INST. ELÉTRICAS/HIDROSANITARIAS/GLP
-        f'IC$ {"{:,.2f}".format(3.4541/100*area/ic)}',#REBOCO INTERNO
-        f'IC$ {"{:,.2f}".format(3.0525/100*area/ic)}',#FORRO
-        f'IC$ {"{:,.2f}".format(3.3839/100*area/ic)}',#IMPERMEABILIZACAO
-        f'IC$ {"{:,.2f}".format(revestimentos/ic)}',#REVESTIMENTOS
-        f'IC$ {"{:,.2f}".format(bancadas/ic)}',#BANCADAS
-        f'IC$ {"{:,.2f}".format(1.8849/100*area/ic)}',#EMASSAMENTO  1 DEMAO
-        f'IC$ {"{:,.2f}".format(0.9586/100*area/ic)}',#REVESTIMENTO EXTERNO
-        f'IC$ {"{:,.2f}".format(tabela1["Esquadrias"].mean()/ic)}',#ESQUADRIAS DE ALUMINIO
-        f'IC$ {"{:,.2f}".format(elevadores/ic)}',#ELEVADORES
-        f'IC$ {"{:,.2f}".format(0.4877/100*area/ic)}',#LIMPEZA GROSSA
-        f'IC$ {"{:,.2f}".format(2.1531/100*area/ic)}',#ESQUADRIAS DE MADEIRA/PCF
-        f'IC$ {"{:,.2f}".format(2.3842/100*area/ic)}',#PINTURA FINAL
-        f'IC$ {"{:,.2f}".format(louças/ic)}',#LOUCAS
-        f'IC$ {"{:,.2f}".format(metais/ic)}',#METAIS
-        f'IC$ {"{:,.2f}".format(0.8782/100*area/ic)}',#LIMPEZA FINAL
-        f'IC$ {"{:,.2f}".format(4.6593/100*area/ic)}',#SERVICOS COMPLEMENTARES
-        f'IC$ {"{:,.2f}".format(0.1747/100*area/ic)}',#VISTORIAS/ENTREGA
-        f'IC$ {"{:,.2f}".format(1.0/100*orcamento_previsto/ic)}'#DESPESAS POS-ENTREGA DA OBRA
+        f'R$ {"{:,.2f}".format(26.0307/100*infraestrutura/ic)}',#CONTENÇÃO/ESCAVAÇÃO
+        f'R$ {"{:,.2f}".format(73.9693/100*infraestrutura/ic)}',#INFRAESTRUTURA
+        f'R$ {"{:,.2f}".format(48.1251/100*area/ic)}',#SUPERESTRUTURA
+        f'R$ {"{:,.2f}".format(3.4514/100*area/ic)}',#MARCACAO  ALV. EXT. C/ TALISCA
+        f'R$ {"{:,.2f}".format(1.6258/100*area/ic)}',#CONTRAPISO
+        f'R$ {"{:,.2f}".format(9.3271/100*area/ic)}',#ALVENARIA INTERNA
+        f'R$ {"{:,.2f}".format(0.8445/100*area/ic)}',#CONTRAMARCO
+        f'R$ {"{:,.2f}".format(2.5130/100*area/ic)}',#REBOCO EXTERNO
+        f'R$ {"{:,.2f}".format(instalações/ic)}',#INST. ELÉTRICAS/HIDROSANITARIAS/GLP
+        f'R$ {"{:,.2f}".format(5.0129/100*area/ic)}',#REBOCO INTERNO
+        f'R$ {"{:,.2f}".format(4.4077/100*area/ic)}',#FORRO
+        f'R$ {"{:,.2f}".format(4.9245/100*area/ic)}',#IMPERMEABILIZACAO
+        f'R$ {"{:,.2f}".format(revestimentos/ic)}',#REVESTIMENTOS
+        f'R$ {"{:,.2f}".format(bancadas/ic)}',#BANCADAS
+        f'R$ {"{:,.2f}".format(2.7311/100*area/ic)}',#EMASSAMENTO  1 DEMAO
+        f'R$ {"{:,.2f}".format(1.4011/100*area/ic)}',#REVESTIMENTO EXTERNO
+        f'R$ {"{:,.2f}".format(esquadrias/ic)}',#ESQUADRIAS DE ALUMINIO
+        f'R$ {"{:,.2f}".format(elevadores/ic)}',#ELEVADORES
+        f'R$ {"{:,.2f}".format(0.7087/100*area/ic)}',#LIMPEZA GROSSA
+        f'R$ {"{:,.2f}".format(3.1158/100*area/ic)}',#ESQUADRIAS DE MADEIRA/PCF
+        f'R$ {"{:,.2f}".format(3.4601/100*area/ic)}',#PINTURA FINAL
+        f'R$ {"{:,.2f}".format(louças/ic)}',#LOUCAS
+        f'R$ {"{:,.2f}".format(metais/ic)}',#METAIS
+        f'R$ {"{:,.2f}".format(1.2862/100*area/ic)}',#LIMPEZA FINAL
+        f'R$ {"{:,.2f}".format(6.8106/100*area/ic)}',#SERVICOS COMPLEMENTARES
+        f'R$ {"{:,.2f}".format(0.2545/100*area/ic)}',#VISTORIAS/ENTREGA
+        f'R$ {"{:,.2f}".format(1.0/100*orcamento_previsto/ic)}'#DESPESAS POS-ENTREGA DA OBRA
         ]
 }
 
 # Criar o DataFrame
 tabela = pd.DataFrame(dados)
 
+# Convertendo os valores da coluna 'CUSTO PREVISTO IC$' para float
+tabela['CUSTO PREVISTO IC$'] = tabela['CUSTO PREVISTO IC$'].str.replace('IC$ ', '').str.replace(',', '').astype(float)
+
+# Calculando o custo previsto por unidade de área equivalente
+tabela['IC$/AE'] = tabela['CUSTO PREVISTO IC$'] / areaequivalente
+
+# Calculando o custo por área equivalente dividido por Orçamento_AE
+tabela['%'] = tabela['IC$/AE'] / Orçamento_AE
+# Formatando a coluna de porcentagem '%' diretamente
+tabela['%'] = tabela['%'].map(lambda x: "{:.2%}".format(x))
+
+# Adicionando o formato desejado às colunas 'CUSTO PREVISTO IC$' e 'IC$/AE'
+tabela['CUSTO PREVISTO IC$'] = tabela['CUSTO PREVISTO IC$'].map(lambda x: f'IC$ {"{:,.2f}".format(x)}')
+tabela['IC$/AE'] = tabela['IC$/AE'].map(lambda x: f'IC$ {"{:,.2f}".format(x)}')
+# Adicionando o texto "/AE" ao final de cada número na coluna 'IC$/AE'
+tabela['IC$/AE'] = tabela['IC$/AE'].map(lambda x: f'{x} /AE')
+
 # Criar uma função para aplicar a formatação
 def formata_linha(linha):
-    if linha.name in [0, 7]:  # Verificar se o índice da linha é 0 ou 7
-        return ['background-color: lightblue; font-weight: bold' for _ in linha]  # Aplicar negrito e cor de fundo azul claro
-    return ['' for _ in linha]  # Não aplicar formatação às outras linhas
+    if linha.name == 0 or linha.name == 7:  # Verificar se o índice da linha é 0 ou 7
+        return ['color: #000000; font-weight: bold; background-color: #D3D3D3' for _ in linha]  # Aplicar negrito, cor de texto preto e cor de fundo cinza claro
+    return ['color: #000000; font-weight: normal' for _ in linha]  # Aplicar cor preta aos títulos das colunas
 
 # Aplicar a formatação ao DataFrame
-tabela_estilizada = tabela.style.apply(formata_linha, axis=1)
+tabela_estilizada = tabela.style.apply(formata_linha, axis=1).set_table_styles([{
+    'selector': 'thead',  # Seletor para o cabeçalho da tabela
+    'props': [('background-color', '#404040')]  # Estilo para o fundo do cabeçalho (fundo cinza escuro)
+}])
+
+
 # Exibindo a tabela
-st.dataframe(tabela_estilizada, width=10000, height=1262)
-
-
-
+st.dataframe(tabela_estilizada, width=8000, height=1262)
